@@ -99,11 +99,31 @@ npm run cms      # terminal 2
 
 Ouvre <http://localhost:4321/admin/>. Les modifications sont écrites directement dans tes fichiers locaux, que tu commites ensuite. **Rien n'est exposé sur le web.**
 
-### 2. Édition en ligne — via GitHub
+### 2. Édition en ligne — deux chemins possibles
 
-Pour éditer depuis n'importe quel navigateur, il faut trois choses.
+Pour éditer depuis n'importe quel navigateur, il faut une authentification. Decap CMS en propose deux, et le fichier `config.yml` contient les deux (l'une est active, l'autre commentée).
 
-**a. Pousser le projet sur GitHub**, puis renseigner le dépôt dans `public/admin/config.yml` :
+#### Option A — Git Gateway + Netlify Identity *(le plus simple)*
+
+C'est le chemin historique de Decap CMS, et il redevient le plus court.
+
+> **À jour de février 2026 :** Netlify avait annoncé la fin de Netlify Identity, puis a **fait marche arrière le 19 février 2026**. Identity reste un service supporté, gratuit sur les offres au crédit. Les guides qui affirment le contraire datent d'avant cette date.
+
+Mise en place : dans Netlify, Project configuration → Identity → *Enable Identity*, puis Services → Git Gateway → *Enable*. Tu invites ensuite ta propre adresse dans l'onglet Identity, et c'est terminé. Aucun déploiement supplémentaire, aucun secret à gérer.
+
+Configuration correspondante :
+
+```yaml
+backend:
+  name: git-gateway
+  branch: main
+```
+
+#### Option B — Backend GitHub + proxy OAuth
+
+Plus verbeux, mais sans dépendance à Netlify Identity.
+
+**a.** Pousser le projet sur GitHub, puis renseigner le dépôt dans `public/admin/config.yml` :
 
 ```yaml
 backend:
@@ -112,12 +132,12 @@ backend:
   branch: main
 ```
 
-**b. Créer une GitHub OAuth App** — Settings → Developer settings → OAuth Apps → New OAuth App.
+**b.** Créer une GitHub OAuth App — Settings → Developer settings → OAuth Apps → New OAuth App.
 
 - Homepage URL : `https://act-free-ai.netlify.app`
 - Authorization callback URL : l'URL de ton proxy (étape c)
 
-**c. Déployer un proxy OAuth.** Decap ne peut pas échanger le code OAuth lui-même. Le plus simple est de déployer un petit proxy prêt à l'emploi (par exemple `vencax/netlify-cms-github-oauth-provider`) sur Netlify, d'y renseigner le `client_id` et le `client_secret` de l'OAuth App, puis de déclarer son URL dans `config.yml` :
+**c.** Déployer un proxy OAuth. Decap ne peut pas échanger le code OAuth lui-même. Le plus simple est de déployer un proxy prêt à l'emploi (par exemple `vencax/netlify-cms-github-oauth-provider`) sur Netlify, d'y renseigner le `client_id` et le `client_secret` de l'OAuth App, puis de déclarer son URL dans `config.yml` :
 
 ```yaml
 backend:
@@ -127,9 +147,7 @@ backend:
   base_url: https://ton-proxy-oauth.netlify.app
 ```
 
-Une fois connecté, chaque publication crée un commit dans le dépôt, ce qui déclenche un redéploiement Netlify. Le site est à jour en une minute environ.
-
-> **Pourquoi pas Netlify Identity ?** Netlify pousse ce service à l'abandon. Le backend GitHub est plus durable, et le contenu vit de toute façon dans Git.
+Dans les deux cas, chaque publication crée un commit dans le dépôt, ce qui déclenche un redéploiement Netlify. Le site est à jour en une minute environ.
 
 L'admin est exclue de l'indexation (`robots.txt` + en-tête `X-Robots-Tag`).
 

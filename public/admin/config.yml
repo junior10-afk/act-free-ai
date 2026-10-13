@@ -1,18 +1,37 @@
 # Configuration Decap CMS — interface d'administration d'Act-Free AI
 #
-# Deux façons d'éditer :
-#   1. En ligne  : backend GitHub (nécessite un proxy OAuth, voir README)
-#   2. En local  : `npm run cms` puis http://localhost:4321/admin/
+# Trois façons d'éditer :
+#   1. En local  : `npm run cms` puis http://localhost:4321/admin/
 #                  (active local_backend ci-dessous, aucun OAuth requis)
+#   2. En ligne, via GitHub + un proxy OAuth   → backend « github » ci-dessous
+#   3. En ligne, via Netlify Identity          → backend « git-gateway », voir README
+#
+# Netlify Identity avait été annoncé comme déprécié, puis Netlify a fait
+# marche arrière le 19 février 2026 : le service reste supporté et gratuit.
+# L'option git-gateway est donc de nouveau la plus rapide à mettre en place.
 
 local_backend: true
 
+# ---------------------------------------------------------------------------
+# Option active : backend GitHub
+# Nécessite de déployer un proxy OAuth (voir README, section Administration).
+# ---------------------------------------------------------------------------
 backend:
   name: github
   repo: VOTRE_COMPTE/act-free-ai
   branch: main
-  # Décommente et renseigne après avoir déployé le proxy OAuth (voir README) :
+  # Décommente et renseigne après avoir déployé le proxy OAuth :
   # base_url: https://votre-proxy-oauth.netlify.app
+
+# ---------------------------------------------------------------------------
+# Option alternative : Git Gateway + Netlify Identity
+# Aucun déploiement supplémentaire : il suffit d'activer Identity et
+# Git Gateway dans l'interface Netlify, puis d'inviter ton adresse.
+# Pour l'utiliser, commente le bloc « backend » ci-dessus et décommente celui-ci.
+# ---------------------------------------------------------------------------
+# backend:
+#   name: git-gateway
+#   branch: main
 
 site_url: https://act-free-ai.netlify.app
 display_url: https://act-free-ai.netlify.app
