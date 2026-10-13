@@ -12,6 +12,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "cms": "decap-server",
+    "test:oauth": "node scripts/test-oauth.mjs",
     "astro": "astro"
   },
   "dependencies": {

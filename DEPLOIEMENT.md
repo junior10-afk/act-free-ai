@@ -132,20 +132,92 @@ je répercute l'URL partout (étape 6).
 
 ## 5. Brancher l'interface d'administration
 
-### Option A — Netlify Identity + Git Gateway (le plus simple)
+Le proxy OAuth est **déjà écrit et testé** : `netlify/functions/auth.mjs` et
+`netlify/functions/callback.mjs`, avec 14 tests qui passent (`npm run test:oauth`).
+Il tourne sur ta propre origine — aucun service tiers ne voit le jeton GitHub.
 
-Aucun code à écrire, tout se fait dans l'interface Netlify.
+### Option A — Proxy auto-hébergé (celle que tu as choisie)
+
+**1. Créer l'OAuth App GitHub** — https://github.com/settings/developers
+
+- **New OAuth App**
+- **Application name** : `Act-Free AI CMS`
+- **Homepage URL** : `https://<ton-site>.netlify.app`
+- **Authorization callback URL** : `https://<ton-site>.netlify.app/callback`
+
+> ⚠️ L'URL de callback doit correspondre **au caractère près**, sinon GitHub
+> renvoie `redirect_uri_mismatch`. Pas de slash final.
+
+Clique **Register application**, puis **Generate a new client secret**.
+Note le **Client ID** et le **Client secret** (le secret n'est affiché qu'une fois).
+
+**2. Déclarer les variables d'environnement** dans Netlify :
+
+*Site configuration → Environment variables → Add a variable*
+
+| Nom | Valeur |
+| --- | --- |
+| `GITHUB_OAUTH_CLIENT_ID` | ton Client ID |
+| `GITHUB_OAUTH_CLIENT_SECRET` | ton Client secret |
+| `SITE_URL` | `https://<ton-site>.netlify.app` |
+
+> 🔴 **Le secret ne doit jamais entrer dans le dépôt.** Il vit uniquement dans
+> les variables Netlify, qui sont chiffrées et invisibles depuis le navigateur.
+> `SITE_URL` fixe le `redirect_uri` : sans elle, les déploiements de
+> prévisualisation généreraient une URL de callback différente et GitHub
+> refuserait l'échange.
+
+**3. Redéployer** : *Deploys → Trigger deploy → Clear cache and deploy site*
+(Les variables d'environnement ne sont prises en compte qu'au build suivant.)
+
+**4. Renseigner le dépôt** dans `public/admin/config.yml` :
+
+```yaml
+backend:
+  name: github
+  repo: TON_COMPTE/act-free-ai     # ← remplace le placeholder
+  branch: main
+  base_url: https://<ton-site>.netlify.app
+  auth_endpoint: auth
+```
+
+Commit + push → Netlify redéploie.
+
+**5. Se connecter** : `https://<ton-site>.netlify.app/admin/`
+
+> Seuls les comptes GitHub ayant un **droit d'écriture** sur le dépôt peuvent
+> publier. Un visiteur qui se connecte obtient un jeton sans droit sur le
+> dépôt : GitHub refuse l'écriture. C'est la protection de fond du dispositif.
+
+### Option B — Decap Turbo (aucun code à maintenir)
+
+Le service officiel hébergé de Decap. L'offre **gratuite** couvre 1 site et
+1 siège — exactement ce cas d'usage. En échange, c'est Decap qui voit le jeton.
+
+1. Créer un compte sur https://turbo.decapcms.org/signup
+2. Dans `public/admin/config.yml` :
+
+   ```yaml
+   backend:
+     name: github
+     repo: TON_COMPTE/act-free-ai
+     branch: main
+     base_url: https://api.turbo.decapcms.org
+   ```
+3. Supprimer `netlify/functions/` (devenu inutile)
+
+### Option C — Netlify Identity + Git Gateway (repli)
+
+Utile seulement si tu veux éviter complètement GitHub OAuth.
 
 1. **Site configuration → Identity** → *Enable Identity*
 2. **Identity → Registration** → mets **`Invite only`**
    🔴 **Ne saute pas cette étape.** Par défaut Identity accepte les
    inscriptions ouvertes : n'importe qui pourrait créer un compte, et avec
-   Git Gateway ce compte peut écrire dans ton dépôt. C'est la faille la plus
-   fréquente sur cette pile.
+   Git Gateway ce compte peut écrire dans ton dépôt.
 3. **Identity → Services → Git Gateway** → *Enable Git Gateway*
-4. **Identity → Invite users** → invite ta propre adresse e-mail
-5. Clique le lien reçu, définis ton mot de passe
-6. Dans `public/admin/config.yml`, remplace le bloc `backend` actif par :
+4. **Identity → Invite users** → invite ta propre adresse
+5. Dans `config.yml`, remplacer le backend par :
 
    ```yaml
    backend:
@@ -153,15 +225,6 @@ Aucun code à écrire, tout se fait dans l'interface Netlify.
      branch: main
    ```
 
-   (le bloc `git-gateway` est déjà présent en commentaire, lignes 32-34)
-7. Commit + push → Netlify redéploie
-8. Va sur `https://<ton-site>.netlify.app/admin/` et connecte-toi
-
-### Option B — Proxy OAuth GitHub
-
-Plus robuste, mais demande de déployer un service supplémentaire. À choisir
-si tu veux éviter Netlify Identity. Compte ~30 min. Dis-moi si tu préfères
-cette voie, je te détaille la procédure.
 
 ---
 
@@ -203,6 +266,19 @@ curl -s https://<ton-site>.netlify.app/admin/index.html | grep -o 'src="[^"]*"'
 
 # 4. La CSP est présente et script-src n'a pas d'unsafe-inline
 curl -sI https://<ton-site>.netlify.app/fr/ | grep -i "content-security-policy"
+
+# 5. Le proxy OAuth redirige bien vers GitHub avec un state
+curl -sI "https://<ton-site>.netlify.app/auth?provider=github&scope=repo" | grep -iE "^location|set-cookie"
+#    attendu : Location -> github.com/login/oauth/authorize?...state=...
+#               Set-Cookie -> decap_oauth_state=...; HttpOnly; Secure; SameSite=Lax
+
+# 6. /callback refuse un appel sans state valide (doit renvoyer une erreur)
+curl -s "https://<ton-site>.netlify.app/callback?code=faux" | grep -o "authorization:github:error"
+#    attendu : authorization:github:error
+
+# 7. Les fonctions sont bien déployées
+curl -sI https://<ton-site>.netlify.app/auth | head -1
+#    attendu : HTTP/2 302   (un 404 signifierait que netlify/functions n'est pas déployé)
 ```
 
 Côté navigateur, ouvre la console (F12) : **zéro erreur CSP** attendue.
@@ -226,7 +302,16 @@ Rappel de l'audit — rien à refaire, c'est déjà dans le code :
 | `unsafe-inline` sur les scripts | CSP à hachages, `script-src` verrouillé |
 | Secrets versionnés | aucun ; `.env` ignoré |
 | Build non reproductible | `package-lock.json` suivi |
+| CSRF sur le retour OAuth | `state` aléatoire (32 octets CSPRNG) + cookie `HttpOnly`/`Secure`/`SameSite=Lax`, comparé puis invalidé |
+| Fuite du jeton vers une page tierce | la popup ne répond qu'à l'origine exacte du site |
+| Élévation de portée OAuth | liste blanche de scopes ; `admin:org` retombe sur `repo` |
+| XSS dans la page de retour | jeton sérialisé via `safeJson`, CSP à nonce |
+| Jeton mis en cache par un proxy | `Cache-Control: no-store` sur `/auth` et `/callback` |
+| Fuite du client secret | uniquement en variable d'environnement Netlify, jamais dans le dépôt |
 
-**Il reste deux points qui dépendent de toi**, tous les deux à l'étape 5 :
-l'inscription Identity en mode *Invite only*, et la révocation du jeton PAT
-après déploiement.
+Ces éléments sont couverts par `npm run test:oauth` (14 tests).
+
+**Il reste trois points qui dépendent de toi** :
+1. définir `GITHUB_OAUTH_CLIENT_SECRET` dans Netlify, jamais dans le dépôt ;
+2. révoquer le jeton PAT une fois le push effectué ;
+3. si tu choisis l'option C, passer l'inscription Identity en *Invite only*.

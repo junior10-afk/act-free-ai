@@ -6,6 +6,20 @@
   NODE_VERSION = "22"
 
 # ---------------------------------------------------------------------------
+# Fonctions serverless
+#
+# Le proxy OAuth de Decap CMS vit ici : netlify/functions/auth.mjs (redirection
+# vers GitHub) et callback.mjs (echange du code contre un jeton). Le routage
+# est declare par `export const config = { path: ... }` dans chaque fichier,
+# aucun redirect n'est necessaire.
+#
+# Identifiants a definir dans Site configuration > Environment variables :
+#   GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET, SITE_URL
+# ---------------------------------------------------------------------------
+[functions]
+  directory = "netlify/functions"
+
+# ---------------------------------------------------------------------------
 # En-têtes de sécurité globaux
 #
 # La Content-Security-Policy n'est PAS définie ici : Astro la génère lui-même
@@ -46,6 +60,26 @@
   [headers.values]
     X-Robots-Tag = "noindex, nofollow, noarchive"
     Cache-Control = "no-store, max-age=0"
+
+# ---------------------------------------------------------------------------
+# Endpoints OAuth
+#
+# Jamais indexables, jamais mis en cache : une reponse de /callback contient
+# un jeton d'acces GitHub valide.
+# ---------------------------------------------------------------------------
+[[headers]]
+  for = "/auth"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, max-age=0"
+    Referrer-Policy = "no-referrer"
+
+[[headers]]
+  for = "/callback"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, max-age=0"
+    Referrer-Policy = "no-referrer"
 
 # ---------------------------------------------------------------------------
 # Cache des ressources versionnées produites par le build
