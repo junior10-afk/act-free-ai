@@ -1,0 +1,194 @@
+# Configuration Decap CMS — interface d'administration d'Act-Free AI
+#
+# Deux façons d'éditer :
+#   1. En ligne  : backend GitHub (nécessite un proxy OAuth, voir README)
+#   2. En local  : `npm run cms` puis http://localhost:4321/admin/
+#                  (active local_backend ci-dessous, aucun OAuth requis)
+
+local_backend: true
+
+backend:
+  name: github
+  repo: VOTRE_COMPTE/act-free-ai
+  branch: main
+  # Décommente et renseigne après avoir déployé le proxy OAuth (voir README) :
+  # base_url: https://votre-proxy-oauth.netlify.app
+
+site_url: https://act-free-ai.netlify.app
+display_url: https://act-free-ai.netlify.app
+logo_url: https://act-free-ai.netlify.app/favicon.svg
+
+media_folder: public/uploads
+public_folder: /uploads
+
+publish_mode: simple
+
+collections:
+  # ------------------------------------------------------------------
+  # FOURNISSEURS
+  # ------------------------------------------------------------------
+  - name: providers
+    label: Fournisseurs
+    label_singular: Fournisseur
+    description: >-
+      Plateformes et API qui donnent accès à des modèles gratuitement.
+    folder: src/content/providers
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    identifier_field: name
+    slug: '{{slug}}'
+    summary: '{{name}} — {{accessType}}'
+    sortable_fields: [name, order, verifiedAt]
+    fields:
+      - { name: name, label: Nom, widget: string }
+      - { name: url, label: Lien du site, widget: string, hint: 'URL complète, ex. https://openrouter.ai' }
+      - { name: description_fr, label: Description (FR), widget: text }
+      - { name: description_en, label: Description (EN), widget: text }
+
+      - name: accessType
+        label: Type d'accès gratuit
+        widget: select
+        options:
+          - { label: 'Gratuit durable', value: unlimited }
+          - { label: 'Crédits offerts', value: credits }
+          - { label: 'Palier gratuit', value: freemium }
+          - { label: '100 % local', value: local }
+
+      - name: models
+        label: Modèles fournis
+        widget: select
+        multiple: true
+        options:
+          - { label: Texte, value: text }
+          - { label: Image, value: image }
+          - { label: Vidéo, value: video }
+          - { label: Audio, value: audio }
+          - { label: Code, value: code }
+          - { label: Embeddings, value: embedding }
+          - { label: Reranking, value: rerank }
+
+      - { name: openaiCompatible, label: 'API compatible OpenAI', widget: boolean, default: false }
+      - { name: signupRequired, label: 'Inscription obligatoire', widget: boolean, default: true }
+      - { name: cardRequired, label: 'Carte bancaire obligatoire', widget: boolean, default: false }
+      - { name: phoneRequired, label: 'Téléphone obligatoire', widget: boolean, default: false }
+
+      - { name: quotas_fr, label: 'Quotas (FR)', widget: text, required: false }
+      - { name: quotas_en, label: 'Quotas (EN)', widget: text, required: false }
+
+      - { name: tags, label: Tags, widget: list, required: false, default: [] }
+      - { name: featured, label: 'Mettre à la une', widget: boolean, default: false }
+      - { name: order, label: 'Ordre d''affichage', widget: number, value_type: int, default: 99 }
+      - name: verifiedAt
+        label: 'Vérifié le'
+        widget: datetime
+        date_format: 'YYYY-MM-DD'
+        time_format: false
+        picker_utc: true
+
+  # ------------------------------------------------------------------
+  # AGENTS
+  # ------------------------------------------------------------------
+  - name: agents
+    label: Agents
+    label_singular: Agent
+    description: Agents open source que l'on peut installer et brancher sur les fournisseurs.
+    folder: src/content/agents
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    identifier_field: name
+    slug: '{{slug}}'
+    summary: '{{name}} — {{author}}'
+    sortable_fields: [name, order, category]
+    fields:
+      - { name: name, label: Nom, widget: string }
+      - { name: repo, label: 'Dépôt GitHub', widget: string }
+      - { name: site, label: 'Site officiel', widget: string, required: false }
+      - { name: author, label: Éditeur, widget: string }
+      - { name: description_fr, label: Description (FR), widget: text }
+      - { name: description_en, label: Description (EN), widget: text }
+      - { name: license, label: Licence, widget: string, hint: 'Ex. MIT, Apache-2.0, AGPL-3.0' }
+
+      - name: category
+        label: Catégorie
+        widget: select
+        options:
+          - { label: 'Agent de code', value: coding }
+          - { label: 'Interface de chat', value: chat }
+          - { label: Automatisation, value: automation }
+          - { label: Framework, value: framework }
+          - { label: 'Exécution locale', value: local }
+
+      - name: worksWith
+        label: 'Fonctionne avec'
+        widget: relation
+        multiple: true
+        required: false
+        collection: providers
+        search_fields: [name]
+        value_field: '{{slug}}'
+        display_fields: [name]
+
+      - { name: order, label: 'Ordre d''affichage', widget: number, value_type: int, default: 99 }
+      - name: verifiedAt
+        label: 'Vérifié le'
+        widget: datetime
+        date_format: 'YYYY-MM-DD'
+        time_format: false
+        picker_utc: true
+
+  # ------------------------------------------------------------------
+  # ACTUALITÉS
+  # ------------------------------------------------------------------
+  - name: news
+    label: Actualités
+    label_singular: Actualité
+    description: 'Nouveaux paliers gratuits, changements de quotas, fermetures.'
+    folder: src/content/news
+    create: true
+    delete: true
+    extension: md
+    format: frontmatter
+    identifier_field: title_fr
+    slug: '{{year}}-{{month}}-{{slug}}'
+    summary: '{{title_fr}}'
+    sortable_fields: [date, title_fr]
+    fields:
+      - { name: title_fr, label: 'Titre (FR)', widget: string }
+      - { name: title_en, label: 'Titre (EN)', widget: string }
+
+      - name: date
+        label: Date
+        widget: datetime
+        date_format: 'YYYY-MM-DD'
+        time_format: false
+        picker_utc: true
+
+      - name: type
+        label: Type
+        widget: select
+        options:
+          - { label: Nouveau, value: new }
+          - { label: Changement, value: change }
+          - { label: 'Fin de service', value: shutdown }
+          - { label: Sortie, value: release }
+
+      - { name: summary_fr, label: 'Résumé (FR)', widget: text }
+      - { name: summary_en, label: 'Résumé (EN)', widget: text }
+      - { name: body_fr, label: 'Corps de l''article (FR)', widget: markdown, required: false }
+      - { name: body_en, label: 'Corps de l''article (EN)', widget: markdown, required: false }
+
+      - name: providers
+        label: 'Fournisseurs concernés'
+        widget: relation
+        multiple: true
+        required: false
+        collection: providers
+        search_fields: [name]
+        value_field: '{{slug}}'
+        display_fields: [name]
+
+      - { name: draft, label: 'Brouillon (non publié)', widget: boolean, default: false }

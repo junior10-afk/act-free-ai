@@ -1,0 +1,76 @@
+---
+import { useTranslations, localize, switchLocalePath, locales, type Lang } from '../i18n/utils';
+
+interface Props {
+  lang: Lang;
+  path: string;
+}
+
+const { lang, path } = Astro.props;
+const t = useTranslations(lang);
+
+const navItems = [
+  { path: '/', key: 'nav.home' },
+  { path: '/providers/', key: 'nav.providers' },
+  { path: '/agents/', key: 'nav.agents' },
+  { path: '/news/', key: 'nav.news' },
+  { path: '/compare/', key: 'nav.compare' },
+];
+
+function isCurrent(itemPath: string): boolean {
+  if (itemPath === '/') return path === '/' || path === '';
+  return path.startsWith(itemPath);
+}
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="site-header">
+  <div class="wrap inner">
+    <a class="brand" href={localize(lang, '/')}>
+      <span class="dot" aria-hidden="true"></span>
+      <span>{t('site.name')}</span>
+      <span class="sub">{t('site.tagline')}</span>
+    </a>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+      {t('nav.menu')}
+    </button>
+
+    <nav class="nav" id="site-nav" data-nav aria-label={t('nav.menu')}>
+      {
+        navItems.map((item) => (
+          <a
+            href={localize(lang, item.path)}
+            aria-current={isCurrent(item.path) ? 'page' : undefined}
+          >
+            {t(item.key)}
+          </a>
+        ))
+      }
+      <div class="lang-switch" role="group" aria-label={t('common.language')}>
+        {
+          locales.map((locale) => (
+            <a
+              href={switchLocalePath(currentPath, locale)}
+              aria-current={locale === lang ? 'true' : undefined}
+              hreflang={locale}
+            >
+              {locale}
+            </a>
+          ))
+        }
+      </div>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const toggle = document.querySelector<HTMLButtonElement>('[data-nav-toggle]');
+  const nav = document.querySelector<HTMLElement>('[data-nav]');
+  toggle?.addEventListener('click', () => {
+    const open = nav?.getAttribute('data-open') === 'true';
+    nav?.setAttribute('data-open', String(!open));
+    toggle.setAttribute('aria-expanded', String(!open));
+  });
+</script>

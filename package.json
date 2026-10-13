@@ -1,0 +1,26 @@
+{
+  "name": "act-free-ai",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Act-Free AI — annuaire bilingue des fournisseurs de modeles IA gratuits et des agents open source.",
+  "scripts": {
+    "predev": "node scripts/sync-cms.mjs",
+    "dev": "astro dev",
+    "start": "astro dev",
+    "prebuild": "node scripts/sync-cms.mjs",
+    "build": "astro build",
+    "preview": "astro preview",
+    "cms": "decap-server",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.4",
+    "astro": "^7.3.8"
+  },
+  "devDependencies": {
+    "decap-cms": "^3.16.3",
+    "decap-server": "^3.11.3"
+  }
+}

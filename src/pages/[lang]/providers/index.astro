@@ -1,0 +1,100 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ProviderCard from '../../../components/ProviderCard.astro';
+import FilterScript from '../../../components/FilterScript.astro';
+import { useTranslations, localize, type Lang } from '../../../i18n/utils';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'fr' } }, { params: { lang: 'en' } }];
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const t = useTranslations(lang);
+
+const providers = (await getCollection('provider')).sort((a, b) => a.data.order - b.data.order);
+
+const accessTypes = ['unlimited', 'credits', 'freemium', 'local'] as const;
+const modelTypes = ['text', 'image', 'video', 'audio', 'code', 'embedding', 'rerank'] as const;
+---
+
+<BaseLayout lang={lang} path="/providers/" title={t('providers.title')} description={t('providers.lead')}>
+  <div class="wrap">
+    <div class="page-head">
+      <h1>{t('providers.title')}</h1>
+      <p class="lead">{t('providers.lead')}</p>
+    </div>
+  </div>
+
+  <div class="wrap" style="padding-top: 2rem;">
+    <div class="toolbar" data-filter-root>
+      <div class="search-row">
+        <label class="sr-only" for="provider-search">{t('providers.search')}</label>
+        <input
+          id="provider-search"
+          type="search"
+          data-search-input
+          placeholder={t('providers.search')}
+          autocomplete="off"
+        />
+        <button class="fbtn" type="button" data-reset>{t('providers.reset')}</button>
+      </div>
+
+      <div class="filter-group">
+        <span class="lbl">{t('providers.filterAccess')}</span>
+        <div class="filter-row">
+          {
+            accessTypes.map((type) => (
+              <button class="fbtn" type="button" data-filter data-attr="access" data-value={type} aria-pressed="false">
+                {t(`access.${type}`)}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <span class="lbl">{t('providers.filterModels')}</span>
+        <div class="filter-row">
+          {
+            modelTypes.map((type) => (
+              <button class="fbtn" type="button" data-filter data-attr="models" data-value={type} aria-pressed="false">
+                {t(`model.${type}`)}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <span class="lbl">{t('providers.filterRequirements')}</span>
+        <div class="filter-row">
+          <button class="fbtn" type="button" data-filter data-attr="card" data-value="false" aria-pressed="false">
+            {t('req.noCard')}
+          </button>
+          <button class="fbtn" type="button" data-filter data-attr="phone" data-value="false" aria-pressed="false">
+            {t('req.noPhone')}
+          </button>
+          <button class="fbtn" type="button" data-filter data-attr="signup" data-value="false" aria-pressed="false">
+            {t('req.noSignup')}
+          </button>
+        </div>
+      </div>
+
+      <div class="results-line">
+        <span>
+          <FilterScript lang={lang} countLabel={t('providers.results')} countLabelPlural={t('providers.resultsPlural')} />
+        </span>
+      </div>
+    </div>
+
+    <div data-list style="padding-bottom: 4rem;">
+      <div class="grid grid-2">
+        {providers.map((entry) => <ProviderCard entry={entry} lang={lang} />)}
+      </div>
+      <div class="empty-state" data-empty hidden>
+        <p style="margin:0">{t('providers.empty')}</p>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

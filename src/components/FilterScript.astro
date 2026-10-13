@@ -1,0 +1,89 @@
+---
+interface Props {
+  lang: string;
+  countLabel: string;
+  countLabelPlural: string;
+}
+
+const { lang, countLabel, countLabelPlural } = Astro.props;
+---
+
+<span>
+  <span data-count>0</span>{' '}
+  <span data-count-label data-one={countLabel} data-many={countLabelPlural}>{countLabelPlural}</span>
+</span>
+
+<script>
+  type FilterRoot = HTMLElement;
+
+  function setup(root: FilterRoot) {
+    const input = root.querySelector<HTMLInputElement>('[data-search-input]');
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-filter]'));
+    const countEl = root.querySelector<HTMLElement>('[data-count]');
+    const labelEl = root.querySelector<HTMLElement>('[data-count-label]');
+    const scopeSelector = root.dataset.scope || '[data-list]';
+    const scope = document.querySelector<HTMLElement>(scopeSelector);
+    if (!scope) return;
+    const items = Array.from(scope.querySelectorAll<HTMLElement>('[data-item]'));
+    const emptyEl = scope.querySelector<HTMLElement>('[data-empty]');
+
+    function activeFor(attr: string): Set<string> {
+      return new Set(
+        buttons
+          .filter((b) => b.dataset.attr === attr && b.getAttribute('aria-pressed') === 'true')
+          .map((b) => b.dataset.value ?? '')
+      );
+    }
+
+    function apply() {
+      const query = (input?.value ?? '').trim().toLowerCase();
+      const attrs = Array.from(new Set(buttons.map((b) => b.dataset.attr ?? ''))).filter(Boolean);
+      const groups = attrs.map((attr) => ({ attr, values: activeFor(attr) }));
+
+      let visible = 0;
+      for (const item of items) {
+        let ok = query === '' || (item.dataset.search ?? '').includes(query);
+
+        if (ok) {
+          for (const { attr, values } of groups) {
+            if (values.size === 0) continue;
+            const tokens = new Set((item.dataset[attr] ?? '').split(/\s+/).filter(Boolean));
+            if (!Array.from(values).some((v) => tokens.has(v))) {
+              ok = false;
+              break;
+            }
+          }
+        }
+
+        item.hidden = !ok;
+        if (ok) visible += 1;
+      }
+
+      if (countEl) countEl.textContent = String(visible);
+      if (labelEl) {
+        labelEl.textContent = visible === 1 ? labelEl.dataset.one ?? '' : labelEl.dataset.many ?? '';
+      }
+      if (emptyEl) emptyEl.hidden = visible !== 0;
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const pressed = button.getAttribute('aria-pressed') === 'true';
+        button.setAttribute('aria-pressed', String(!pressed));
+        apply();
+      });
+    });
+
+    input?.addEventListener('input', apply);
+
+    root.querySelector<HTMLButtonElement>('[data-reset]')?.addEventListener('click', () => {
+      if (input) input.value = '';
+      buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      apply();
+    });
+
+    apply();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-filter-root]').forEach(setup);
+</script>

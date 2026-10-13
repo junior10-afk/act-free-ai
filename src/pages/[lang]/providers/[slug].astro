@@ -1,0 +1,170 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import {
+  useTranslations,
+  bilingual,
+  localize,
+  formatDate,
+  modelLabel,
+  type Lang,
+} from '../../../i18n/utils';
+
+export async function getStaticPaths() {
+  const providers = await getCollection('provider');
+  return ['fr', 'en'].flatMap((lang) =>
+    providers.map((entry) => ({
+      params: { lang, slug: entry.id },
+      props: { entry },
+    }))
+  );
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const { entry } = Astro.props as { entry: any };
+const t = useTranslations(lang);
+const d = entry.data;
+
+const description = bilingual(d, 'description', lang);
+const quotas = bilingual(d, 'quotas', lang);
+
+const agents = (await getCollection('agent')).filter((a) => a.data.worksWith.includes(entry.id));
+const relatedNews = (await getCollection('news'))
+  .filter((n) => !n.data.draft && n.data.providers.includes(entry.id))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+const providerNames: Record<string, string> = { [entry.id]: d.name };
+---
+
+<BaseLayout lang={lang} path={`/providers/${entry.id}/`} title={d.name} description={description}>
+  <div class="wrap">
+    <div class="page-head">
+      <a class="back-link" href={localize(lang, '/providers/')}>← {t('provider.back')}</a>
+      <span class={`badge badge-${d.accessType}`}>{t(`access.${d.accessType}`)}</span>
+      <h1 style="margin-top:0.75rem">{d.name}</h1>
+      <p class="lead">{description}</p>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <h2 style="font-size:1.1rem;font-family:var(--font-sans);font-weight:600;letter-spacing:0.02em;margin-bottom:0.75rem">
+          {t('provider.freeAccess')}
+        </h2>
+        <p class="prose" style="color:var(--ink-2)">
+          {t(`access.${d.accessType}`)} — {t(`access.${d.accessType}.desc`)}
+        </p>
+
+        <h2 style="font-size:1.1rem;font-family:var(--font-sans);font-weight:600;letter-spacing:0.02em;margin:2rem 0 0.75rem">
+          {t('provider.models')}
+        </h2>
+        <div class="chips" style="margin-bottom:0.5rem">
+          {d.models.map((m: string) => <span class="chip">{modelLabel(lang, m)}</span>)}
+        </div>
+
+        {
+          quotas && (
+            <>
+              <h2 style="font-size:1.1rem;font-family:var(--font-sans);font-weight:600;letter-spacing:0.02em;margin:2rem 0 0.75rem">
+                {t('provider.quotas')}
+              </h2>
+              <p class="prose" style="color:var(--ink-2)">{quotas}</p>
+            </>
+          )
+        }
+
+        {
+          agents.length > 0 && (
+            <>
+              <h2 style="font-size:1.1rem;font-family:var(--font-sans);font-weight:600;letter-spacing:0.02em;margin:2.5rem 0 1rem">
+                {t('provider.relatedAgents')}
+              </h2>
+              <div class="grid grid-2">
+                {agents.map((agent) => (
+                  <a class="card" href={localize(lang, `/agents/${agent.id}/`)}>
+                    <h3>{agent.data.name}</h3>
+                    <p class="desc">{bilingual(agent.data, 'description', lang)}</p>
+                  </a>
+                ))}
+              </div>
+            </>
+          )
+        }
+
+        {
+          relatedNews.length > 0 && (
+            <>
+              <h2 style="font-size:1.1rem;font-family:var(--font-sans);font-weight:600;letter-spacing:0.02em;margin:2.5rem 0 1rem">
+                {t('provider.relatedNews')}
+              </h2>
+              <div>
+                {relatedNews.map((item) => (
+                  <a
+                    href={localize(lang, `/news/${item.id}/`)}
+                    style="display:block;padding:0.85rem 0;border-bottom:1px solid var(--line-2);color:inherit"
+                  >
+                    <strong style="font-weight:500">{bilingual(item.data, 'title', lang)}</strong>
+                    <span style="color:var(--muted);font-size:0.85rem"> · {formatDate(item.data.date, lang)}</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )
+        }
+
+        <p class="note">{t('provider.disclaimer')}</p>
+      </div>
+
+      <aside>
+        <div class="side-panel">
+          <h3>{t('providers.title')}</h3>
+          <ul class="fact-list">
+            <li>
+              <span class="k">{t('provider.freeAccess')}</span>
+              <span class="v">{t(`access.${d.accessType}`)}</span>
+            </li>
+            <li>
+              <span class="k">{t('req.signup')}</span>
+              <span class="v">{d.signupRequired ? t('common.yes') : t('common.no')}</span>
+            </li>
+            <li>
+              <span class="k">{t('req.card')}</span>
+              <span class="v">{d.cardRequired ? t('common.yes') : t('common.no')}</span>
+            </li>
+            <li>
+              <span class="k">{t('req.phone')}</span>
+              <span class="v">{d.phoneRequired ? t('common.yes') : t('common.no')}</span>
+            </li>
+            <li>
+              <span class="k">{t('provider.openai')}</span>
+              <span class="v">
+                {d.openaiCompatible ? t('provider.compatible') : t('provider.notCompatible')}
+              </span>
+            </li>
+            <li>
+              <span class="k">{t('provider.verifiedAt')}</span>
+              <span class="v">{formatDate(d.verifiedAt, lang)}</span>
+            </li>
+          </ul>
+
+          {
+            d.tags.length > 0 && (
+              <div class="chips" style="margin-top:1.1rem">
+                {d.tags.map((tag: string) => <span class="chip chip-plain">{tag}</span>)}
+              </div>
+            )
+          }
+
+          <a
+            class="btn btn-primary"
+            href={d.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style="margin-top:1.25rem;width:100%;justify-content:center"
+          >
+            {t('provider.visit')} ↗
+          </a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

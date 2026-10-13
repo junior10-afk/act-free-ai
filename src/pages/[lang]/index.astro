@@ -1,0 +1,119 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProviderCard from '../../components/ProviderCard.astro';
+import AgentCard from '../../components/AgentCard.astro';
+import NewsCard from '../../components/NewsCard.astro';
+import { useTranslations, localize, type Lang } from '../../i18n/utils';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'fr' } }, { params: { lang: 'en' } }];
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const t = useTranslations(lang);
+
+const providers = (await getCollection('provider')).sort((a, b) => a.data.order - b.data.order);
+const agents = (await getCollection('agent')).sort((a, b) => a.data.order - b.data.order);
+const news = (await getCollection('news', ({ data }) => !data.draft)).sort(
+  (a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+const featured = providers.filter((p) => p.data.featured).slice(0, 4);
+const latestNews = news.slice(0, 3);
+const featuredAgents = agents.slice(0, 3);
+
+const providerNames: Record<string, string> = Object.fromEntries(
+  providers.map((p) => [p.id, p.data.name])
+);
+---
+
+<BaseLayout lang={lang} path="/">
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">{t('home.eyebrow')}</span>
+      <h1>{t('home.title')}</h1>
+      <p class="lead">{t('home.lead')}</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href={localize(lang, '/providers/')}>{t('home.ctaProviders')}</a>
+        <a class="btn" href={localize(lang, '/news/')}>{t('home.ctaNews')}</a>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="num">{providers.length}</span>
+          <span class="lbl">{t('home.statProviders')}</span>
+        </div>
+        <div class="stat">
+          <span class="num">{agents.length}</span>
+          <span class="lbl">{t('home.statAgents')}</span>
+        </div>
+        <div class="stat">
+          <span class="num">{news.length}</span>
+          <span class="lbl">{t('home.statNews')}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <span class="kicker">{t('home.featured')}</span>
+          <h2>{t('home.featuredLead')}</h2>
+        </div>
+        <a class="more" href={localize(lang, '/providers/')}>{t('home.viewAll')} →</a>
+      </div>
+
+      <div class="grid grid-2">
+        {featured.map((entry) => <ProviderCard entry={entry} lang={lang} />)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <span class="kicker">{t('nav.news')}</span>
+          <h2>{t('home.latest')}</h2>
+        </div>
+        <a class="more" href={localize(lang, '/news/')}>{t('home.viewAll')} →</a>
+      </div>
+
+      <div>
+        {latestNews.map((entry) => <NewsCard entry={entry} lang={lang} />)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <span class="kicker">{t('nav.agents')}</span>
+          <h2>{t('home.agentsTitle')}</h2>
+          <p class="lead" style="margin-top:0.75rem">{t('home.agentsLead')}</p>
+        </div>
+        <a class="more" href={localize(lang, '/agents/')}>{t('home.viewAll')} →</a>
+      </div>
+
+      <div class="grid grid-3">
+        {featuredAgents.map((entry) => <AgentCard entry={entry} lang={lang} providerNames={providerNames} />)}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="border-top: 1px solid var(--line);">
+    <div class="wrap">
+      <div style="max-width: 72ch">
+        <span class="kicker" style="font-size:0.72rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.6rem">
+          {t('home.aboutTitle')}
+        </span>
+        <h2 style="margin-bottom:1.25rem">{t('home.aboutTitle')}</h2>
+        <p class="lead" style="margin-top:0">{t('home.aboutBody')}</p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

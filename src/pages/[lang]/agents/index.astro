@@ -1,0 +1,76 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AgentCard from '../../../components/AgentCard.astro';
+import FilterScript from '../../../components/FilterScript.astro';
+import { useTranslations, type Lang } from '../../../i18n/utils';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'fr' } }, { params: { lang: 'en' } }];
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const t = useTranslations(lang);
+
+const agents = (await getCollection('agent')).sort((a, b) => a.data.order - b.data.order);
+const providers = await getCollection('provider');
+
+const providerNames: Record<string, string> = Object.fromEntries(
+  providers.map((p) => [p.id, p.data.name])
+);
+
+const categories = ['coding', 'chat', 'automation', 'framework', 'local'] as const;
+---
+
+<BaseLayout lang={lang} path="/agents/" title={t('agents.title')} description={t('agents.lead')}>
+  <div class="wrap">
+    <div class="page-head">
+      <h1>{t('agents.title')}</h1>
+      <p class="lead">{t('agents.lead')}</p>
+    </div>
+  </div>
+
+  <div class="wrap" style="padding-top: 2rem;">
+    <div class="toolbar" data-filter-root>
+      <div class="search-row">
+        <label class="sr-only" for="agent-search">{t('providers.search')}</label>
+        <input
+          id="agent-search"
+          type="search"
+          data-search-input
+          placeholder={t('providers.search')}
+          autocomplete="off"
+        />
+        <button class="fbtn" type="button" data-reset>{t('providers.reset')}</button>
+      </div>
+
+      <div class="filter-group">
+        <span class="lbl">{t('agents.filterCategory')}</span>
+        <div class="filter-row">
+          {
+            categories.map((category) => (
+              <button class="fbtn" type="button" data-filter data-attr="category" data-value={category} aria-pressed="false">
+                {t(`category.${category}`)}
+              </button>
+            ))
+          }
+        </div>
+      </div>
+
+      <div class="results-line">
+        <span>
+          <FilterScript lang={lang} countLabel={t('providers.results')} countLabelPlural={t('providers.resultsPlural')} />
+        </span>
+      </div>
+    </div>
+
+    <div data-list style="padding-bottom: 4rem;">
+      <div class="grid grid-3">
+        {agents.map((entry) => <AgentCard entry={entry} lang={lang} providerNames={providerNames} />)}
+      </div>
+      <div class="empty-state" data-empty hidden>
+        <p style="margin:0">{t('agents.empty')}</p>
+      </div>
+    </div>
+  </div>
+</BaseLayout>

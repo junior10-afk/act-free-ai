@@ -1,0 +1,120 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import {
+  useTranslations,
+  bilingual,
+  localize,
+  formatDate,
+  categoryLabel,
+  type Lang,
+} from '../../../i18n/utils';
+
+export async function getStaticPaths() {
+  const agents = await getCollection('agent');
+  return ['fr', 'en'].flatMap((lang) =>
+    agents.map((entry) => ({
+      params: { lang, slug: entry.id },
+      props: { entry },
+    }))
+  );
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const { entry } = Astro.props as { entry: any };
+const t = useTranslations(lang);
+const d = entry.data;
+
+const description = bilingual(d, 'description', lang);
+
+const allProviders = await getCollection('provider');
+const providers = allProviders.filter((p) => d.worksWith.includes(p.id));
+const providerMap: Record<string, any> = Object.fromEntries(allProviders.map((p) => [p.id, p]));
+---
+
+<BaseLayout lang={lang} path={`/agents/${entry.id}/`} title={d.name} description={description}>
+  <div class="wrap">
+    <div class="page-head">
+      <a class="back-link" href={localize(lang, '/agents/')}>← {t('agent.back')}</a>
+      <span class="chip chip-plain">{categoryLabel(lang, d.category)}</span>
+      <h1 style="margin-top:0.75rem">{d.name}</h1>
+      <p class="lead">{description}</p>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <h2 style="font-size:1.1rem;font-family:var(--font-sans);font-weight:600;letter-spacing:0.02em;margin-bottom:1rem">
+          {t('agent.worksWith')}
+        </h2>
+
+        {
+          providers.length > 0 ? (
+            <div class="grid grid-2">
+              {providers.map((provider) => (
+                <a class="card" href={localize(lang, `/providers/${provider.id}/`)}>
+                  <div class="card-top">
+                    <h3>{provider.data.name}</h3>
+                    <span class={`badge badge-${provider.data.accessType}`}>
+                      {t(`access.${provider.data.accessType}`)}
+                    </span>
+                  </div>
+                  <p class="desc">{bilingual(provider.data, 'description', lang)}</p>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p style="color:var(--muted)">—</p>
+          )
+        }
+      </div>
+
+      <aside>
+        <div class="side-panel">
+          <h3>{t('nav.agents')}</h3>
+          <ul class="fact-list">
+            <li>
+              <span class="k">{t('agent.author')}</span>
+              <span class="v">{d.author}</span>
+            </li>
+            <li>
+              <span class="k">{t('agent.license')}</span>
+              <span class="v">{d.license}</span>
+            </li>
+            <li>
+              <span class="k">{t('agents.filterCategory')}</span>
+              <span class="v">{categoryLabel(lang, d.category)}</span>
+            </li>
+            <li>
+              <span class="k">{t('common.verified')}</span>
+              <span class="v">{formatDate(d.verifiedAt, lang)}</span>
+            </li>
+          </ul>
+
+          <a
+            class="btn btn-primary"
+            href={d.repo}
+            target="_blank"
+            rel="noopener noreferrer"
+            style="margin-top:1.25rem;width:100%;justify-content:center"
+          >
+            {t('agent.visit')} ↗
+          </a>
+
+          {
+            d.site && (
+              <a
+                class="btn"
+                href={d.site}
+                target="_blank"
+                rel="noopener noreferrer"
+                style="margin-top:0.6rem;width:100%;justify-content:center"
+              >
+                {d.site.replace(/^https?:\/\//, '').replace(/\/$/, '')} ↗
+              </a>
+            )
+          }
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

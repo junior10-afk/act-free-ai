@@ -1,0 +1,197 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { useTranslations, bilingual, formatDate, modelLabel, type Lang } from '../../i18n/utils';
+import { safeJsonForScript } from '../../utils/json';
+
+export function getStaticPaths() {
+  return [{ params: { lang: 'fr' } }, { params: { lang: 'en' } }];
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const t = useTranslations(lang);
+
+const providers = (await getCollection('provider')).sort((a, b) => a.data.order - b.data.order);
+
+const yes = t('common.yes');
+const no = t('common.no');
+
+const dataset = providers.map((p) => ({
+  id: p.id,
+  name: p.data.name,
+  url: p.data.url,
+  access: t(`access.${p.data.accessType}`),
+  models: p.data.models.map((m: string) => modelLabel(lang, m)).join(', '),
+  quotas: bilingual(p.data, 'quotas', lang) || '—',
+  signup: p.data.signupRequired ? yes : no,
+  card: p.data.cardRequired ? yes : no,
+  phone: p.data.phoneRequired ? yes : no,
+  openai: p.data.openaiCompatible ? t('provider.compatible') : t('provider.notCompatible'),
+  tags: (p.data.tags ?? []).join(', ') || '—',
+  verified: formatDate(p.data.verifiedAt, lang),
+}));
+
+const rows = [
+  { key: 'access', label: t('provider.freeAccess') },
+  { key: 'models', label: t('provider.models') },
+  { key: 'quotas', label: t('provider.quotas') },
+  { key: 'signup', label: t('req.signup') },
+  { key: 'card', label: t('req.card') },
+  { key: 'phone', label: t('req.phone') },
+  { key: 'openai', label: t('provider.openai') },
+  { key: 'tags', label: t('provider.tags') },
+  { key: 'verified', label: t('provider.verifiedAt') },
+];
+
+const payload = {
+  providers: dataset,
+  rows,
+  labels: {
+    empty: t('compare.empty'),
+    need: t('compare.need'),
+    feature: t('compare.feature'),
+    remove: t('compare.remove'),
+  },
+};
+---
+
+<BaseLayout lang={lang} path="/compare/" title={t('compare.title')} description={t('compare.lead')}>
+  <div class="wrap">
+    <div class="page-head">
+      <h1>{t('compare.title')}</h1>
+      <p class="lead">{t('compare.lead')}</p>
+    </div>
+  </div>
+
+  <div class="wrap" style="padding: 2rem 0 4rem;">
+    <div class="compare-bar">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <span class="lbl" style="font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)">
+          {t('compare.select')}
+        </span>
+        <button class="fbtn" type="button" data-compare-clear>{t('compare.clear')}</button>
+      </div>
+      <div class="picker" data-compare-picker>
+        {
+          dataset.map((provider) => (
+            <button class="fbtn" type="button" data-compare-add={provider.id} aria-pressed="false">
+              {provider.name}
+            </button>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="empty-state" data-compare-empty>
+      <p style="margin:0">{t('compare.empty')}</p>
+    </div>
+
+    <div class="table-scroll" data-compare-output hidden></div>
+  </div>
+
+  <script type="application/json" id="compare-data" set:html={safeJsonForScript(payload)} />
+</BaseLayout>
+
+<script>
+  const dataEl = document.getElementById('compare-data');
+  if (dataEl) {
+    const payload = JSON.parse(dataEl.textContent ?? '{}');
+    const byId = new Map<string, any>(payload.providers.map((p: any) => [p.id, p]));
+
+    const params = new URLSearchParams(window.location.search);
+    const selected: string[] = (params.get('ids') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => byId.has(id));
+
+    function syncUrl() {
+      const url = new URL(window.location.href);
+      if (selected.length > 0) {
+        url.searchParams.set('ids', selected.join(','));
+      } else {
+        url.searchParams.delete('ids');
+      }
+      window.history.replaceState({}, '', url);
+    }
+
+    const picker = document.querySelector('[data-compare-picker]');
+    const output = document.querySelector<HTMLElement>('[data-compare-output]');
+    const empty = document.querySelector<HTMLElement>('[data-compare-empty]');
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-compare-add]'));
+
+    function escapeHtml(value: string): string {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function render() {
+      buttons.forEach((button) => {
+        const active = selected.includes(button.dataset.compareAdd ?? '');
+        button.setAttribute('aria-pressed', String(active));
+      });
+
+      if (!output || !empty) return;
+
+      if (selected.length < 2) {
+        output.hidden = true;
+        output.innerHTML = '';
+        empty.hidden = false;
+        empty.querySelector('p')!.textContent =
+          selected.length === 0 ? payload.labels.empty : payload.labels.need;
+        return;
+      }
+
+      empty.hidden = true;
+      output.hidden = false;
+
+      const head = selected
+        .map(
+          (id) =>
+            `<th scope="col">${escapeHtml(byId.get(id).name)}<br><a href="${escapeHtml(
+              byId.get(id).url
+            )}" target="_blank" rel="noopener noreferrer" style="font-weight:400;text-transform:none;letter-spacing:0">${escapeHtml(
+              byId.get(id).url.replace(/^https?:\/\//, '')
+            )}</a></th>`
+        )
+        .join('');
+
+      const body = payload.rows
+        .map((row: any) => {
+          const cells = selected
+            .map((id) => `<td>${escapeHtml(byId.get(id)[row.key] ?? '—')}</td>`)
+            .join('');
+          return `<tr><th scope="row">${escapeHtml(row.label)}</th>${cells}</tr>`;
+        })
+        .join('');
+
+      output.innerHTML = `<table class="compare-table"><thead><tr><th scope="col">${escapeHtml(
+        payload.labels.feature
+      )}</th>${head}</tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const id = button.dataset.compareAdd ?? '';
+        const index = selected.indexOf(id);
+        if (index >= 0) {
+          selected.splice(index, 1);
+        } else {
+          selected.push(id);
+        }
+        syncUrl();
+        render();
+      });
+    });
+
+    document.querySelector('[data-compare-clear]')?.addEventListener('click', () => {
+      selected.length = 0;
+      syncUrl();
+      render();
+    });
+
+    render();
+  }
+</script>

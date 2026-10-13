@@ -1,0 +1,61 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# ---------------------------------------------------------------------------
+# En-têtes de sécurité globaux
+#
+# La Content-Security-Policy n'est PAS définie ici : Astro la génère lui-même
+# en calculant les hachages de ses scripts et styles inline (voir
+# `security.csp` dans astro.config.mjs), et l'injecte dans chaque page.
+# La redéfinir ici l'affaiblirait en la fusionnant avec une version plus large.
+# ---------------------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+    Cross-Origin-Resource-Policy = "same-origin"
+
+# ---------------------------------------------------------------------------
+# Interface d'administration
+#
+# Elle est exclue de l'indexation, jamais mise en cache, et volontairement
+# privée de Content-Security-Policy : Decap CMS injecte ses styles à
+# l'exécution et ouvre une fenêtre vers GitHub pour l'authentification, ce
+# qu'une CSP stricte casserait. La protection repose sur l'authentification
+# GitHub (seuls les comptes ayant un droit d'écriture sur le dépôt peuvent
+# publier) et sur le fait que la page n'expose aucune donnée.
+# ---------------------------------------------------------------------------
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, max-age=0"
+    X-Frame-Options = "DENY"
+
+[[headers]]
+  for = "/admin"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Cache-Control = "no-store, max-age=0"
+
+# ---------------------------------------------------------------------------
+# Cache des ressources versionnées produites par le build
+# ---------------------------------------------------------------------------
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.astro/
+.env
+.env.production
+.DS_Store
+Thumbs.db
+*.log
+.netlify/
+.shots/
+
+# Notes de travail locales de l'assistant (hors périmètre du projet publié)
+.workbuddy-ai/
+
+# Bundle Decap CMS recopié depuis node_modules par scripts/sync-cms.mjs
+public/admin/cms/

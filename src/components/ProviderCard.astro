@@ -1,0 +1,59 @@
+---
+import { useTranslations, bilingual, localize, formatDate, modelLabel, type Lang } from '../i18n/utils';
+
+interface Props {
+  entry: any;
+  lang: Lang;
+}
+
+const { entry, lang } = Astro.props;
+const t = useTranslations(lang);
+const d = entry.data;
+
+const description = bilingual(d, 'description', lang);
+const href = localize(lang, `/providers/${entry.id}/`);
+
+const searchBlob = [
+  d.name,
+  d.description_fr,
+  d.description_en,
+  ...(d.tags ?? []),
+  ...(d.models ?? []),
+  d.accessType,
+]
+  .join(' ')
+  .toLowerCase()
+  .replace(/\s+/g, ' ');
+---
+
+<article
+  class="card provider-card"
+  data-item
+  data-search={searchBlob}
+  data-access={d.accessType}
+  data-models={d.models.join(' ')}
+  data-card={String(d.cardRequired)}
+  data-phone={String(d.phoneRequired)}
+  data-signup={String(d.signupRequired)}
+>
+  <div class="card-top">
+    <h3><a href={href}>{d.name}</a></h3>
+    <span class={`badge badge-${d.accessType}`}>{t(`access.${d.accessType}`)}</span>
+  </div>
+
+  <p class="desc">{description}</p>
+
+  <div class="chips">
+    {d.models.map((m: string) => <span class="chip">{modelLabel(lang, m)}</span>)}
+    {d.openaiCompatible && <span class="chip chip-ok">OpenAI API</span>}
+  </div>
+
+  <div class="foot">
+    <span>
+      {!d.cardRequired && <span class="chip chip-ok" style="margin-right:4px">{t('req.noCard')}</span>}
+      {!d.signupRequired && <span class="chip chip-ok" style="margin-right:4px">{t('req.noSignup')}</span>}
+      {!d.phoneRequired && d.signupRequired && <span class="chip chip-ok">{t('req.noPhone')}</span>}
+    </span>
+    <span>{t('common.verified')} {formatDate(d.verifiedAt, lang)}</span>
+  </div>
+</article>

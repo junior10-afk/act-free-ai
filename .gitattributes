@@ -1,0 +1,17 @@
+# Normalise les fins de ligne : stockées en LF dans le dépôt, quel que soit
+# l'OS de la personne qui contribue. Évite les diffs fantômes entre Windows
+# et le build Linux de Netlify.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+
+# GitHub reconnaît automatiquement ces fichiers comme générés
+package-lock.json linguist-generated=true

@@ -1,0 +1,101 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import {
+  useTranslations,
+  bilingual,
+  localize,
+  formatDate,
+  newsTypeLabel,
+  type Lang,
+} from '../../../i18n/utils';
+import { renderMarkdown } from '../../../utils/markdown';
+
+export async function getStaticPaths() {
+  const news = await getCollection('news', ({ data }) => !data.draft);
+  return ['fr', 'en'].flatMap((lang) =>
+    news.map((entry) => ({
+      params: { lang, slug: entry.id },
+      props: { entry },
+    }))
+  );
+}
+
+const { lang } = Astro.params as { lang: Lang };
+const { entry } = Astro.props as { entry: any };
+const t = useTranslations(lang);
+const d = entry.data;
+
+const title = bilingual(d, 'title', lang);
+const summary = bilingual(d, 'summary', lang);
+const body = renderMarkdown(bilingual(d, 'body', lang));
+
+const allProviders = await getCollection('provider');
+const providerMap: Record<string, any> = Object.fromEntries(allProviders.map((p) => [p.id, p]));
+const providers = (d.providers ?? []).map((id: string) => providerMap[id]).filter(Boolean);
+
+const badgeClass =
+  d.type === 'shutdown' ? 'freemium' : d.type === 'new' ? 'unlimited' : 'local';
+---
+
+<BaseLayout lang={lang} path={`/news/${entry.id}/`} title={title} description={summary}>
+  <div class="wrap">
+    <div class="page-head">
+      <a class="back-link" href={localize(lang, '/news/')}>← {t('news.back')}</a>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:0.75rem">
+        <span class={`badge badge-${badgeClass}`}>{newsTypeLabel(lang, d.type)}</span>
+        <time datetime={d.date.toISOString()} style="font-size:0.85rem;color:var(--muted)">
+          {formatDate(d.date, lang)}
+        </time>
+      </div>
+      <h1 style="max-width:22ch">{title}</h1>
+      <p class="lead">{summary}</p>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <div class="prose" set:html={body} />
+
+        {
+          providers.length > 0 && (
+            <>
+              <h2 style="font-size:1.05rem;font-family:var(--font-sans);font-weight:600;margin:2.5rem 0 1rem">
+                {t('news.relatedProviders')}
+              </h2>
+              <div class="chips">
+                {providers.map((provider: any) => (
+                  <a class="chip chip-plain" href={localize(lang, `/providers/${provider.id}/`)}>
+                    {provider.data.name}
+                  </a>
+                ))}
+              </div>
+            </>
+          )
+        }
+      </div>
+
+      <aside>
+        <div class="side-panel">
+          <h3>{t('news.title')}</h3>
+          <ul class="fact-list">
+            <li>
+              <span class="k">{t('common.updated')}</span>
+              <span class="v">{formatDate(d.date, lang)}</span>
+            </li>
+            <li>
+              <span class="k">{t('providers.filterAll')}</span>
+              <span class="v">{newsTypeLabel(lang, d.type)}</span>
+            </li>
+          </ul>
+          <a
+            class="btn"
+            href={localize(lang, '/news/')}
+            style="margin-top:1.25rem;width:100%;justify-content:center"
+          >
+            {t('news.back')}
+          </a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

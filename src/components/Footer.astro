@@ -1,0 +1,50 @@
+---
+import { useTranslations, localize, type Lang } from '../i18n/utils';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href={localize(lang, '/')}>
+          <span class="dot" aria-hidden="true"></span>
+          <span>{t('site.name')}</span>
+        </a>
+        <p style="margin-top: 0.9rem; max-width: 40ch; color: var(--ink-2); font-size: 0.9rem;">
+          {t('footer.tagline')}
+        </p>
+      </div>
+
+      <div>
+        <h4>{t('footer.nav')}</h4>
+        <ul>
+          <li><a href={localize(lang, '/providers/')}>{t('nav.providers')}</a></li>
+          <li><a href={localize(lang, '/agents/')}>{t('nav.agents')}</a></li>
+          <li><a href={localize(lang, '/news/')}>{t('nav.news')}</a></li>
+          <li><a href={localize(lang, '/compare/')}>{t('nav.compare')}</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4>{t('footer.legal')}</h4>
+        <ul>
+          <li><a href={localize(lang, '/rss.xml')}>{t('news.rss')}</a></li>
+          <li><a href="/sitemap-index.xml">Sitemap</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="disclaimer">
+      {t('footer.disclaimer')}<br />
+      {t('footer.builtWith')} · © {year} {t('site.name')}
+    </p>
+  </div>
+</footer>
