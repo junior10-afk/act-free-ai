@@ -4,6 +4,11 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # decap-cms est une devDependency, et le hook prebuild (scripts/sync-cms.mjs)
+  # recopie son bundle dans public/admin/cms/. Si npm omet les devDependencies
+  # (ce qui arrive quand NODE_ENV=production), la copie echoue et le build
+  # s'arrete. On force donc leur installation.
+  NPM_FLAGS = "--include=dev"
 
 # ---------------------------------------------------------------------------
 # Fonctions serverless
