@@ -7,23 +7,32 @@ aucun secret versionné, `package-lock.json` suivi.
 
 ---
 
-## 0. Ce qui bloque aujourd'hui
+## 0. État actuel
 
-La seule étape que je ne peux pas exécuter à ta place est **l'authentification
-GitHub**. Voici pourquoi, pour que tu ne perdes pas de temps à chercher :
+| Étape | État |
+| --- | --- |
+| 1. Créer le dépôt GitHub | ✅ `junior10-afk/act-free-ai` (public) |
+| 2. Créer un jeton d'accès | ✅ fait, puis utilisé ponctuellement |
+| 3. Pousser le code | ✅ 6 commits sur `main`, upstream configuré |
+| 4. Déployer sur Netlify | ⏳ à faire |
+| 5. Brancher l'administration | ⏳ après le déploiement |
+| 6. Répercuter l'URL réelle | ⏳ l'URL `act-free-ai.netlify.app` est déjà en place |
 
-| Vérification | Résultat | Conséquence |
-| --- | --- | --- |
-| `github.com` joignable | ✅ `200` | `git push` fonctionne |
-| `api.github.com` joignable | ❌ `000` | `gh` est **inutilisable** |
-| Identifiants GitHub stockés | ❌ aucun | une authentification est requise |
-| `gh` installé | ❌ | et l'installer ne servirait à rien (voir ci-dessus) |
+**Ce qui a débloqué le push.** Le diagnostic initial était trop pessimiste :
+`api.github.com` **est** joignable, l'échec précédent était transitoire (et le
+sandbox de l'assistant bloque GitHub, ce qui faussait le test). L'API GitHub
+est donc utilisable — mais `gh` reste inutile ici, l'installation n'a jamais
+abouti. La voie retenue est `git` + jeton fine-grained.
 
-`gh auth login` et `gh repo create` passent tous les deux par `api.github.com`,
-qui est injoignable depuis cet environnement. **`gh` n'est donc pas la solution**
-— inutile de l'installer.
+**Hygiène du jeton.** Il a été utilisé une seule fois, en argument ponctuel de
+`git push`, avec `-c credential.helper=` pour court-circuiter le gestionnaire
+d'identifiants. Vérifié après coup : `.git/config` contient l'URL **sans**
+jeton, et aucune occurrence du jeton n'existe dans l'arborescence.
+👉 **Il reste à le révoquer** : https://github.com/settings/personal-access-tokens
 
-La solution est `git` + un **jeton d'accès personnel (PAT)**.
+Les sections 1 à 3 ci-dessous sont conservées comme référence de ce qui a été
+fait. **Tu peux passer directement à l'étape 4.**
+
 
 ---
 
@@ -170,18 +179,16 @@ Note le **Client ID** et le **Client secret** (le secret n'est affiché qu'une f
 **3. Redéployer** : *Deploys → Trigger deploy → Clear cache and deploy site*
 (Les variables d'environnement ne sont prises en compte qu'au build suivant.)
 
-**4. Renseigner le dépôt** dans `public/admin/config.yml` :
+**4. Vérifier le dépôt** dans `public/admin/config.yml` (déjà en place) :
 
 ```yaml
 backend:
   name: github
-  repo: TON_COMPTE/act-free-ai     # ← remplace le placeholder
+  repo: junior10-afk/act-free-ai
   branch: main
-  base_url: https://<ton-site>.netlify.app
+  base_url: https://<ton-site>.netlify.app   # ← à ajuster si le sous-domaine change
   auth_endpoint: auth
 ```
-
-Commit + push → Netlify redéploie.
 
 **5. Se connecter** : `https://<ton-site>.netlify.app/admin/`
 
@@ -239,7 +246,7 @@ ou fais-le à la main :
 | `astro.config.mjs` | `site:` | URL canonique, sitemap, RSS |
 | `public/robots.txt` | `Sitemap:` | plan du site |
 | `public/admin/config.yml` | `site_url`, `display_url`, `logo_url` | liens du CMS |
-| `public/admin/config.yml` | `repo:` | `TON_COMPTE/act-free-ai` |
+| `public/admin/config.yml` | `repo:` | déjà réglé : `junior10-afk/act-free-ai` |
 
 > Ces URL alimentent les balises `<link rel="canonical">` et `<hreflang>`.
 > Si elles restent fausses, Google indexe une adresse qui n'existe pas.
