@@ -1,304 +1,186 @@
-# Déploiement d'Act-Free AI
+# Déploiement et maintenance d'Act-Free AI
 
-Guide pas à pas, de la machine locale jusqu'au site en ligne.
-
-Le code est prêt : build vert (87 pages), 2 commits, arbre de travail propre,
-aucun secret versionné, `package-lock.json` suivi.
+Document de référence : ce qui est en ligne, comment ça fonctionne, comment
+republier, et les pièges déjà rencontrés.
 
 ---
 
-## 0. État actuel
+## 1. État actuel — tout est en ligne
 
-| Étape | État |
+| Élément | Valeur |
 | --- | --- |
-| 1. Créer le dépôt GitHub | ✅ `junior10-afk/act-free-ai` (public) |
-| 2. Créer un jeton d'accès | ✅ fait, puis utilisé ponctuellement |
-| 3. Pousser le code | ✅ 6 commits sur `main`, upstream configuré |
-| 4. Déployer sur Netlify | ⏳ à faire |
-| 5. Brancher l'administration | ⏳ après le déploiement |
-| 6. Répercuter l'URL réelle | ⏳ l'URL `act-free-ai.netlify.app` est déjà en place |
-
-**Ce qui a débloqué le push.** Le diagnostic initial était trop pessimiste :
-`api.github.com` **est** joignable, l'échec précédent était transitoire (et le
-sandbox de l'assistant bloque GitHub, ce qui faussait le test). L'API GitHub
-est donc utilisable — mais `gh` reste inutile ici, l'installation n'a jamais
-abouti. La voie retenue est `git` + jeton fine-grained.
-
-**Hygiène du jeton.** Il a été utilisé une seule fois, en argument ponctuel de
-`git push`, avec `-c credential.helper=` pour court-circuiter le gestionnaire
-d'identifiants. Vérifié après coup : `.git/config` contient l'URL **sans**
-jeton, et aucune occurrence du jeton n'existe dans l'arborescence.
-👉 **Il reste à le révoquer** : https://github.com/settings/personal-access-tokens
-
-Les sections 1 à 3 ci-dessous sont conservées comme référence de ce qui a été
-fait. **Tu peux passer directement à l'étape 4.**
-
+| **Site public** | <https://act-free-ai.netlify.app> |
+| **Interface d'édition** | <https://act-free-ai.netlify.app/admin/> |
+| **Dépôt** | <https://github.com/junior10-afk/act-free-ai> (public) |
+| Site Netlify | id `2c8108fa-62b5-4ad6-8d20-fea1416648ff` |
+| Compte Netlify | `junior10-afk` (team `6966c06ec3e89c105b1d1d41`) |
+| Pages | 87, bilingues FR + EN |
+| Déploiement | Automatique à chaque `push` sur `main` |
 
 ---
 
-## 1. Créer le dépôt GitHub
+## 2. Architecture
 
-À faire dans ton navigateur : **https://github.com/new**
+```
+GitHub (junior10-afk/act-free-ai)
+        │  push sur main
+        ▼
+Netlify — build : npm run build
+        │   ├─ prebuild → scripts/sync-cms.mjs  (copie Decap CMS dans public/)
+        │   ├─ astro build  → dist/  (87 pages statiques)
+        │   └─ netlify/functions/*.mjs  → proxy OAuth
+        ▼
+https://act-free-ai.netlify.app
+        │
+        ├─ /fr/ et /en/  →  site public
+        ├─ /admin/       →  Decap CMS (édition)
+        ├─ /auth         →  redirige vers GitHub
+        └─ /callback     →  échange le code contre un jeton
+```
 
-- **Repository name** : `act-free-ai`
-- **Visibility** : `Public`
-- ⚠️ **Ne coche RIEN** : ni README, ni .gitignore, ni licence.
-  Un dépôt non vide ferait échouer le premier `push` (historiques divergents).
-
-Tu obtiens une page vide avec des instructions. Ignore-les, on a déjà tout.
-
----
-
-## 2. Créer un jeton d'accès (PAT)
-
-Deux options. **La première est recommandée.**
-
-### Option A — Jeton *fine-grained* (recommandé)
-
-Limité à un seul dépôt, révocable, sans accès au reste de ton compte.
-
-1. https://github.com/settings/personal-access-tokens/new
-2. **Token name** : `act-free-ai-deploy`
-3. **Expiration** : 7 jours (le temps du déploiement, tu pourras le refaire)
-4. **Repository access** → `Only select repositories` → `act-free-ai`
-5. **Permissions** → `Repository permissions` → **Contents** = `Read and write`
-   *(c'est la seule permission nécessaire)*
-6. **Generate token** → copie la valeur `github_pat_...`
-
-### Option B — Jeton *classic*
-
-https://github.com/settings/tokens/new → coche uniquement la case `repo`.
-
-> **Hygiène du jeton — à lire une fois**
-> - Ne colle **jamais** le jeton dans un fichier du projet (il finirait commité).
-> - Ne le mets **pas** dans l'URL du remote de façon permanente : il serait
->   écrit en clair dans `.git/config`.
-> - Révoke-le dès le déploiement terminé : https://github.com/settings/tokens
-> - Le jeton est un mot de passe. Il ne doit apparaître ni dans un écran
->   partagé, ni dans un message.
+**Pourquoi un proxy OAuth maison plutôt que Netlify Identity** : le proxy tourne
+sur la même origine que le site, donc aucun service tiers ne voit jamais le
+jeton GitHub. Le code est dans `netlify/functions/`, couvert par
+`npm run test:oauth` (14 tests).
 
 ---
 
-## 3. Pousser le code
+## 3. Publier du contenu
 
-### Si tu me donnes le jeton
+### Par l'interface web (recommandé)
 
-Je pousse en une commande, sans jamais l'écrire sur le disque :
+1. <https://act-free-ai.netlify.app/admin/>
+2. **Login with GitHub** → autorise l'application
+3. Choisis une collection : Fournisseurs, Agents, Actualités
+4. Crée ou modifie une fiche, enregistre
+
+Chaque enregistrement crée un commit, ce qui déclenche un redéploiement
+automatique. Le contenu est en ligne environ une minute plus tard.
+
+Seuls les comptes GitHub ayant un **droit d'écriture** sur le dépôt peuvent
+publier. Un visiteur qui se connecte obtient un jeton sans droit : GitHub
+refuse l'écriture.
+
+### En local
 
 ```bash
-cd "C:/Users/lemou/Desktop/Code - Tools/Sire web/Act-free-AI"
-git remote add origin https://github.com/<TON_COMPTE>/act-free-ai.git
-GIT_ASKPASS=/dev/null \
-  git -c credential.helper= \
-      push https://x-access-token:<LE_JETON>@github.com/<TON_COMPTE>/act-free-ai.git main
-git remote set-url origin https://github.com/<TON_COMPTE>/act-free-ai.git
+npm install
+npm run cms     # Decap en local, sans OAuth
+npm run dev     # dans un second terminal → http://localhost:4321/admin/
 ```
 
-La dernière ligne **retire le jeton** de `.git/config`.
+### Directement en Git
 
-### Si tu préfères le faire toi-même
+Le contenu vit dans `src/content/` : `providers/`, `agents/`, `news/`.
+Un fichier Markdown par entrée, avec des champs suffixés `_fr` / `_en`.
+Le schéma est validé par Zod dans `src/content.config.ts` — une entrée
+invalide fait échouer le build.
 
-Dans **ton** terminal (Git Bash ou PowerShell) :
+---
+
+## 4. Redéployer
+
+**Automatique** : tout `push` sur `main`.
+
+**Manuel** : Netlify → **Deploys** → **Trigger deploy** → *Clear cache and
+deploy site*. Nécessaire après un changement de variable d'environnement.
+
+**Déploiement local sans passer par Git** (dépannage) :
 
 ```bash
-cd "C:/Users/lemou/Desktop/Code - Tools/Sire web/Act-free-AI"
-git remote add origin https://github.com/<TON_COMPTE>/act-free-ai.git
-git push -u origin main
+npm run build
+NETLIFY_AUTH_TOKEN=xxx NETLIFY_SITE_ID=2c8108fa-62b5-4ad6-8d20-fea1416648ff \
+  node scripts/deploy-netlify.mjs
 ```
 
-Git Credential Manager ouvrira une fenêtre de navigateur pour te connecter.
-C'est la voie la plus sûre : le jeton ne transite nulle part.
+`scripts/netlify-status.mjs` inspecte le compte (sites, dépôt lié,
+déploiements, noms des variables d'environnement) :
 
-**Attendu** : `* [new branch] main -> main`, 74 fichiers, 2 commits.
-
----
-
-## 4. Déployer sur Netlify
-
-⚠️ **Passe par l'intégration GitHub, pas par un glisser-déposer de `dist/`.**
-C'est important : le CMS (étape 5) écrit dans le dépôt Git, et chaque
-enregistrement déclenche un rebuild. Un déploiement manuel casserait cette
-boucle — tu publierais un article qui n'apparaîtrait jamais en ligne.
-
-1. https://app.netlify.com → **Add new site** → **Import an existing project**
-2. **Deploy with GitHub** → autorise Netlify (une seule fois)
-3. Choisis le dépôt `act-free-ai`
-4. Netlify lit `netlify.toml`, tu n'as rien à saisir. Vérifie juste :
-   - **Build command** : `npm run build`
-   - **Publish directory** : `dist`
-   - **Node version** : `22` (déjà dans `netlify.toml`)
-5. **Deploy site**
-
-Le premier build prend ~1–2 min. Netlify t'attribue une URL du type
-`https://chose-aleatoire-123.netlify.app`.
-
-**Sur le sous-domaine** : `act-free-ai` est très probablement déjà pris.
-Dans **Site configuration → Change site name**, choisis un variant disponible
-(`act-free-ai-fr`, `actfree-ai`, `act-free-ia`…). Dis-moi lequel tu obtiens,
-je répercute l'URL partout (étape 6).
-
----
-
-## 5. Brancher l'interface d'administration
-
-Le proxy OAuth est **déjà écrit et testé** : `netlify/functions/auth.mjs` et
-`netlify/functions/callback.mjs`, avec 14 tests qui passent (`npm run test:oauth`).
-Il tourne sur ta propre origine — aucun service tiers ne voit le jeton GitHub.
-
-### Option A — Proxy auto-hébergé (celle que tu as choisie)
-
-**1. Créer l'OAuth App GitHub** — https://github.com/settings/developers
-
-- **New OAuth App**
-- **Application name** : `Act-Free AI CMS`
-- **Homepage URL** : `https://<ton-site>.netlify.app`
-- **Authorization callback URL** : `https://<ton-site>.netlify.app/callback`
-
-> ⚠️ L'URL de callback doit correspondre **au caractère près**, sinon GitHub
-> renvoie `redirect_uri_mismatch`. Pas de slash final.
-
-Clique **Register application**, puis **Generate a new client secret**.
-Note le **Client ID** et le **Client secret** (le secret n'est affiché qu'une fois).
-
-**2. Déclarer les variables d'environnement** dans Netlify :
-
-*Site configuration → Environment variables → Add a variable*
-
-| Nom | Valeur |
-| --- | --- |
-| `GITHUB_OAUTH_CLIENT_ID` | ton Client ID |
-| `GITHUB_OAUTH_CLIENT_SECRET` | ton Client secret |
-| `SITE_URL` | `https://<ton-site>.netlify.app` |
-
-> 🔴 **Le secret ne doit jamais entrer dans le dépôt.** Il vit uniquement dans
-> les variables Netlify, qui sont chiffrées et invisibles depuis le navigateur.
-> `SITE_URL` fixe le `redirect_uri` : sans elle, les déploiements de
-> prévisualisation généreraient une URL de callback différente et GitHub
-> refuserait l'échange.
-
-**3. Redéployer** : *Deploys → Trigger deploy → Clear cache and deploy site*
-(Les variables d'environnement ne sont prises en compte qu'au build suivant.)
-
-**4. Vérifier le dépôt** dans `public/admin/config.yml` (déjà en place) :
-
-```yaml
-backend:
-  name: github
-  repo: junior10-afk/act-free-ai
-  branch: main
-  base_url: https://<ton-site>.netlify.app   # ← à ajuster si le sous-domaine change
-  auth_endpoint: auth
+```bash
+NETLIFY_AUTH_TOKEN=xxx node scripts/netlify-status.mjs --log
 ```
 
-**5. Se connecter** : `https://<ton-site>.netlify.app/admin/`
-
-> Seuls les comptes GitHub ayant un **droit d'écriture** sur le dépôt peuvent
-> publier. Un visiteur qui se connecte obtient un jeton sans droit sur le
-> dépôt : GitHub refuse l'écriture. C'est la protection de fond du dispositif.
-
-### Option B — Decap Turbo (aucun code à maintenir)
-
-Le service officiel hébergé de Decap. L'offre **gratuite** couvre 1 site et
-1 siège — exactement ce cas d'usage. En échange, c'est Decap qui voit le jeton.
-
-1. Créer un compte sur https://turbo.decapcms.org/signup
-2. Dans `public/admin/config.yml` :
-
-   ```yaml
-   backend:
-     name: github
-     repo: TON_COMPTE/act-free-ai
-     branch: main
-     base_url: https://api.turbo.decapcms.org
-   ```
-3. Supprimer `netlify/functions/` (devenu inutile)
-
-### Option C — Netlify Identity + Git Gateway (repli)
-
-Utile seulement si tu veux éviter complètement GitHub OAuth.
-
-1. **Site configuration → Identity** → *Enable Identity*
-2. **Identity → Registration** → mets **`Invite only`**
-   🔴 **Ne saute pas cette étape.** Par défaut Identity accepte les
-   inscriptions ouvertes : n'importe qui pourrait créer un compte, et avec
-   Git Gateway ce compte peut écrire dans ton dépôt.
-3. **Identity → Services → Git Gateway** → *Enable Git Gateway*
-4. **Identity → Invite users** → invite ta propre adresse
-5. Dans `config.yml`, remplacer le backend par :
-
-   ```yaml
-   backend:
-     name: git-gateway
-     branch: main
-   ```
-
-
 ---
 
-## 6. Répercuter l'URL réelle
+## 5. Variables d'environnement
 
-Une fois le sous-domaine connu, il reste **3 fichiers** où figure l'URL
-provisoire `act-free-ai.netlify.app`. Dis-moi l'URL finale et je m'en occupe,
-ou fais-le à la main :
+À définir dans Netlify → **Site configuration** → **Environment variables**.
+Toutes avec le scope **Functions** au minimum.
 
-| Fichier | Ligne | À remplacer |
+| Variable | Valeur | Rôle |
 | --- | --- | --- |
-| `astro.config.mjs` | `site:` | URL canonique, sitemap, RSS |
-| `public/robots.txt` | `Sitemap:` | plan du site |
-| `public/admin/config.yml` | `site_url`, `display_url`, `logo_url` | liens du CMS |
-| `public/admin/config.yml` | `repo:` | déjà réglé : `junior10-afk/act-free-ai` |
+| `GITHUB_OAUTH_CLIENT_ID` | Client ID de l'OAuth App | identification auprès de GitHub |
+| `GITHUB_OAUTH_CLIENT_SECRET` | Client secret | échange du code contre un jeton |
+| `SITE_URL` | `https://act-free-ai.netlify.app` | fixe le `redirect_uri` |
 
-> Ces URL alimentent les balises `<link rel="canonical">` et `<hreflang>`.
-> Si elles restent fausses, Google indexe une adresse qui n'existe pas.
+`SITE_URL` est importante : sans elle, le `redirect_uri` serait déduit de l'URL
+de la requête, et les déploiements de prévisualisation généreraient une adresse
+de rappel différente que GitHub refuserait.
 
-Puis : `git add -A && git commit -m "URL de production" && git push`
-→ Netlify redéploie automatiquement.
+L'OAuth App est déclarée sur <https://github.com/settings/developers> avec :
+
+- **Homepage URL** : `https://act-free-ai.netlify.app`
+- **Authorization callback URL** : `https://act-free-ai.netlify.app/callback`
+
+⚠️ L'URL de callback doit correspondre **au caractère près**, sans slash final,
+sinon GitHub renvoie `redirect_uri_mismatch`.
 
 ---
 
-## 7. Contrôles après mise en ligne
+## 6. Pièges déjà rencontrés
 
-À vérifier une fois le site en ligne :
+### L'app GitHub de Netlify doit avoir accès au dépôt
 
-```bash
-# 1. Les en-têtes de sécurité sont bien servis
-curl -sI https://<ton-site>.netlify.app/ | grep -iE "strict-transport|content-type-options|referrer|x-frame"
+Symptôme : le build échoue à l'étape `preparing repo` avec
 
-# 2. L'admin est bien exclu de l'indexation
-curl -sI https://<ton-site>.netlify.app/admin/ | grep -i "x-robots-tag"
-
-# 3. Le CMS est bien servi en local (pas de CDN tiers)
-curl -s https://<ton-site>.netlify.app/admin/index.html | grep -o 'src="[^"]*"'
-#    attendu : src="/admin/cms/decap-cms.js"  (aucune URL http:// externe)
-
-# 4. La CSP est présente et script-src n'a pas d'unsafe-inline
-curl -sI https://<ton-site>.netlify.app/fr/ | grep -i "content-security-policy"
-
-# 5. Le proxy OAuth redirige bien vers GitHub avec un state
-curl -sI "https://<ton-site>.netlify.app/auth?provider=github&scope=repo" | grep -iE "^location|set-cookie"
-#    attendu : Location -> github.com/login/oauth/authorize?...state=...
-#               Set-Cookie -> decap_oauth_state=...; HttpOnly; Secure; SameSite=Lax
-
-# 6. /callback refuse un appel sans state valide (doit renvoyer une erreur)
-curl -s "https://<ton-site>.netlify.app/callback?code=faux" | grep -o "authorization:github:error"
-#    attendu : authorization:github:error
-
-# 7. Les fonctions sont bien déployées
-curl -sI https://<ton-site>.netlify.app/auth | head -1
-#    attendu : HTTP/2 302   (un 404 signifierait que netlify/functions n'est pas déployé)
+```
+Host key verification failed.
+fatal: Could not read from remote repository.
 ```
 
-Côté navigateur, ouvre la console (F12) : **zéro erreur CSP** attendue.
+L'erreur est une erreur **SSH**, alors que Netlify clone en HTTPS — le message
+induit en erreur. Un dépôt public et clonable anonymement peut échouer ainsi.
 
-Test fonctionnel : dans `/admin/`, crée un fournisseur brouillon, enregistre,
-puis vérifie qu'un nouveau commit apparaît sur GitHub et qu'un déploiement
-Netlify se déclenche. Supprime-le ensuite.
+Cause : l'installation de l'app Netlify ne couvre pas le dépôt, typiquement
+parce qu'elle a été faite en « Only select repositories » **avant** la création
+du dépôt.
+
+Correctif : <https://github.com/apps/netlify/installations/new> → autoriser
+**All repositories** (ou ajouter le dépôt) → **Save**.
+
+### Le déploiement par archive zip de l'API Netlify est inutilisable
+
+Netlify convertit les séparateurs de chemin en **antislashs** : une archive
+contenant `fr/index.html` produit un fichier littéralement nommé
+`fr\index.html` à la racine. Résultat : la racine fonctionne, mais **tous les
+sous-dossiers renvoient 404**.
+
+Vérification : comparer `zipfile.namelist()` (slashs corrects) avec
+`GET /api/v1/deploys/{id}/files` (antislashs).
+
+Contournement : l'API par empreintes, implémentée dans
+`scripts/deploy-netlify.mjs`.
+
+### Un déploiement par API ne traite pas `netlify.toml`
+
+En-têtes de sécurité, redirections et fonctions sont alors absents. Il faut un
+déploiement par Git ou par la CLI Netlify.
+
+### La racine `/` ne redirige pas en 301 — c'est volontaire
+
+`src/pages/index.astro` est une page de détection de langue : elle lit
+`navigator.language` et envoie vers `/fr/` ou `/en/`, avec repli
+`<meta http-equiv="refresh">` et liens manuels. Ne pas « corriger » en
+redirection figée : ce serait moins bon, car ça ignorerait la langue du
+navigateur.
+
+### Astro 7 : `params` n'est pas fusionné dans `Astro.props`
+
+Il faut lire `Astro.params.lang`, pas `Astro.props.lang`.
 
 ---
 
-## 8. Ce qui a déjà été sécurisé
-
-Rappel de l'audit — rien à refaire, c'est déjà dans le code :
+## 7. Sécurité
 
 | Risque | Traitement |
 | --- | --- |
@@ -314,11 +196,42 @@ Rappel de l'audit — rien à refaire, c'est déjà dans le code :
 | Élévation de portée OAuth | liste blanche de scopes ; `admin:org` retombe sur `repo` |
 | XSS dans la page de retour | jeton sérialisé via `safeJson`, CSP à nonce |
 | Jeton mis en cache par un proxy | `Cache-Control: no-store` sur `/auth` et `/callback` |
-| Fuite du client secret | uniquement en variable d'environnement Netlify, jamais dans le dépôt |
+| Fuite du client secret | uniquement en variable d'environnement Netlify |
 
 Ces éléments sont couverts par `npm run test:oauth` (14 tests).
 
-**Il reste trois points qui dépendent de toi** :
-1. définir `GITHUB_OAUTH_CLIENT_SECRET` dans Netlify, jamais dans le dépôt ;
-2. révoquer le jeton PAT une fois le push effectué ;
-3. si tu choisis l'option C, passer l'inscription Identity en *Invite only*.
+**À savoir** : Netlify injecte un script `/.netlify/scripts/hud` dans toutes les
+pages, y compris `/admin/`. Il est absent de nos sources. C'est l'hébergeur qui
+l'ajoute — il pourrait de toute façon injecter ce qu'il veut — mais c'est à
+garder en tête, la page d'administration manipulant un jeton GitHub.
+
+---
+
+## 8. Vérifications après mise en ligne
+
+```bash
+B=https://act-free-ai.netlify.app
+
+# En-têtes de securite (7 attendus)
+curl -sI $B/fr/ | grep -iE "strict-transport|content-type-options|referrer-policy|permissions-policy|cross-origin|x-frame"
+
+# Admin exclu de l'indexation
+curl -sI $B/admin/ | grep -i "x-robots-tag"
+
+# CSP presente, script-src sans unsafe-inline
+curl -s $B/fr/ | grep -o 'content-security-policy[^>]*' | head -c 200
+
+# Le proxy OAuth redirige vers GitHub avec un state
+curl -sI "$B/auth?provider=github&scope=repo" | grep -iE "^location|set-cookie"
+
+# Le state du cookie doit correspondre a celui de l'URL
+# Un /callback sans state valide doit refuser
+curl -s "$B/callback?code=faux" | grep -o "authorization:github:error"
+
+# Elevation de portee refusee (doit retomber sur repo)
+curl -sI "$B/auth?scope=admin:org" | grep -o 'scope=[a-z:_]*'
+```
+
+Test fonctionnel : sur `/admin/`, créer une fiche brouillon, enregistrer, puis
+vérifier qu'un commit apparaît sur GitHub et qu'un déploiement se déclenche.
+Supprimer ensuite la fiche de test.
