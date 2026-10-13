@@ -19,7 +19,7 @@ local_backend: true
 # ---------------------------------------------------------------------------
 backend:
   name: github
-  repo: VOTRE_COMPTE/act-free-ai
+  repo: junior10-afk/act-free-ai
   branch: main
   base_url: https://act-free-ai.netlify.app
   auth_endpoint: auth
@@ -29,10 +29,10 @@ backend:
 # Remplace le bloc ci-dessus par :
 #   backend:
 #     name: github
-#     repo: VOTRE_COMPTE/act-free-ai
+#     repo: junior10-afk/act-free-ai
 #     branch: main
 #     base_url: https://api.turbo.decapcms.org
-# et supprime netlify/functions/. Voir DEPLOIEMENT.md, étape 5, option C.
+# et supprime netlify/functions/. Voir DEPLOIEMENT.md, étape 5, option B.
 # ---------------------------------------------------------------------------
 
 site_url: https://act-free-ai.netlify.app
